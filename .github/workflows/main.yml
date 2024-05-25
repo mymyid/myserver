@@ -2,7 +2,7 @@ name: AlwaysData.com Deployment
 on:
   push:
     branches:
-      - main
+      - master
 jobs:
   web-deploy:
     name: 🎉 Deploy
