@@ -1,8 +1,10 @@
 package main
 
 import (
-	"flag"
 	"log"
+
+	"github.com/domyid/chatserver/config"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
@@ -46,11 +48,14 @@ func runHub() {
 }
 
 func main() {
-	app := fiber.New()
+	site := fiber.New(config.Iteung)
+	site.Use(cors.New(config.Cors))
 
-	app.Static("/", "./home.html")
+	//app := fiber.New()
 
-	app.Use(func(c *fiber.Ctx) {
+	site.Static("/", "./home.html")
+
+	site.Use(func(c *fiber.Ctx) {
 		if websocket.IsWebSocketUpgrade(c) { // Returns true if the client requested upgrade to the WebSocket protocol
 			c.Next()
 		}
@@ -58,7 +63,7 @@ func main() {
 
 	go runHub()
 
-	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
+	site.Get("/ws", websocket.New(func(c *websocket.Conn) {
 		// When the function returns, unregister the client and close the connection
 		defer func() {
 			unregister <- c
@@ -87,7 +92,5 @@ func main() {
 		}
 	}))
 
-	addr := flag.String("addr", ":8080", "http service address")
-	flag.Parse()
-	app.Listen(*addr)
+	log.Fatal(site.Listen(config.IPPort))
 }
