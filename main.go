@@ -55,12 +55,6 @@ func main() {
 
 	site.Static("/", "./home.html")
 
-	site.Use(func(c *fiber.Ctx) {
-		if websocket.IsWebSocketUpgrade(c) { // Returns true if the client requested upgrade to the WebSocket protocol
-			c.Next()
-		}
-	})
-
 	go runHub()
 
 	site.Get("/ws", websocket.New(func(c *websocket.Conn) {
