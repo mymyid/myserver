@@ -47,6 +47,35 @@ func runHub() {
 	}
 }
 
+func runSocket(c *websocket.Conn) {
+	// When the function returns, unregister the client and close the connection
+	defer func() {
+		unregister <- c
+		c.Close()
+	}()
+
+	// Register the client
+	register <- c
+
+	for {
+		messageType, message, err := c.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Println("read error:", err)
+			}
+
+			return // Calls the deferred function, i.e. closes the connection on error
+		}
+
+		if messageType == websocket.TextMessage {
+			// Broadcast the received message
+			broadcast <- string(message)
+		} else {
+			log.Println("websocket message received of type", messageType)
+		}
+	}
+}
+
 func main() {
 	site := fiber.New(config.Iteung)
 	site.Use(cors.New(config.Cors))
@@ -57,34 +86,7 @@ func main() {
 
 	go runHub()
 
-	site.Get("/ws", websocket.New(func(c *websocket.Conn) {
-		// When the function returns, unregister the client and close the connection
-		defer func() {
-			unregister <- c
-			c.Close()
-		}()
-
-		// Register the client
-		register <- c
-
-		for {
-			messageType, message, err := c.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Println("read error:", err)
-				}
-
-				return // Calls the deferred function, i.e. closes the connection on error
-			}
-
-			if messageType == websocket.TextMessage {
-				// Broadcast the received message
-				broadcast <- string(message)
-			} else {
-				log.Println("websocket message received of type", messageType)
-			}
-		}
-	}))
+	site.Get("/ws", websocket.New(runSocket))
 
 	log.Fatal(site.Listen(config.IPPort))
 }
