@@ -14,9 +14,9 @@ var origins = []string{
 	"https://home.ulbi.ac.id",
 	"https://alpha.ulbi.ac.id",
 	"https://dias.ulbi.ac.id",
-	"https://iteung.ulbi.ac.id",
-	"https://whatsauth.github.io",
-	"https://pmb.ulbi.ac.id",
+	"https://meet.my.my.id",
+	"https://chatgpl.do.my.id",
+	"https://www.do.my.id",
 }
 
 var headers = []string{
