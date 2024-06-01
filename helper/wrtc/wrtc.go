@@ -54,16 +54,19 @@ func RunWebRTCSocket(c *websocket.Conn) {
 			continue
 		}
 
-		handleSignal(peerConnection, signal)
+		handleSignal(peerConnection, signal, c)
 	}
 }
 
-func handleSignal(peerConnection *webrtc.PeerConnection, signal map[string]interface{}) {
+func handleSignal(peerConnection *webrtc.PeerConnection, signal map[string]interface{}, c *websocket.Conn) {
 	if sdp, ok := signal["sdp"]; ok {
-		var session webrtc.SessionDescription
-		if err := json.Unmarshal([]byte(sdp.(string)), &session); err != nil {
-			fmt.Println("Error unmarshalling SDP:", err)
-			return
+		sdpMap := sdp.(map[string]interface{})
+		sdpType := sdpMap["type"].(string)
+		sdpContent := sdpMap["sdp"].(string)
+
+		session := webrtc.SessionDescription{
+			SDP:  sdpContent,
+			Type: webrtc.NewSDPType(sdpType),
 		}
 
 		if session.Type == webrtc.SDPTypeOffer {
@@ -82,6 +85,9 @@ func handleSignal(peerConnection *webrtc.PeerConnection, signal map[string]inter
 				fmt.Println("Error setting local description:", err)
 				return
 			}
+
+			answerJSON, _ := json.Marshal(answer)
+			c.WriteMessage(websocket.TextMessage, answerJSON)
 		} else if session.Type == webrtc.SDPTypeAnswer {
 			if err := peerConnection.SetRemoteDescription(session); err != nil {
 				fmt.Println("Error setting remote description:", err)
@@ -89,10 +95,15 @@ func handleSignal(peerConnection *webrtc.PeerConnection, signal map[string]inter
 			}
 		}
 	} else if candidate, ok := signal["candidate"]; ok {
-		var iceCandidate webrtc.ICECandidateInit
-		if err := json.Unmarshal([]byte(candidate.(string)), &iceCandidate); err != nil {
-			fmt.Println("Error unmarshalling ICE candidate:", err)
-			return
+		candidateMap := candidate.(map[string]interface{})
+		candidateString := candidateMap["candidate"].(string)
+		sdpMid := candidateMap["sdpMid"].(string)
+		sdpMLineIndex := uint16(candidateMap["sdpMLineIndex"].(float64))
+
+		iceCandidate := webrtc.ICECandidateInit{
+			Candidate:     candidateString,
+			SDPMid:        &sdpMid,
+			SDPMLineIndex: &sdpMLineIndex,
 		}
 
 		if err := peerConnection.AddICECandidate(iceCandidate); err != nil {
