@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "WebRTC",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

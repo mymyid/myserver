@@ -1,0 +1,11 @@
+meta {
+  name: Join Room
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{url}}/api/room/{{room_id}}/join
+  body: json
+  auth: none
+}
