@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -75,7 +76,7 @@ func JoinRoom() fiber.Handler {
 			// Process offer/answer and set remote description
 			offer := webrtc.SessionDescription{}
 			if err := json.Unmarshal(signal.Data, &offer); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid offer format"})
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid %s format", signal.Type)})
 			}
 			// Example: room.HandleOfferOrAnswer(signal.Data)
 		case "candidate":
