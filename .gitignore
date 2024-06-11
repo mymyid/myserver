@@ -1,0 +1,10 @@
+.env
+tmp/
+/tmp
+tmp
+go.sum
+logs
+main
+.notes
+deploy-dev.sh
+bin
