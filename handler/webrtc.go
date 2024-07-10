@@ -11,23 +11,20 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-type ClientOffer struct {
-	Uid   string
-	Offer webrtc.SessionDescription
-}
-
-type ClientAnswer struct {
+type CommunicationData struct {
 	Uid    string
+	Offer  webrtc.SessionDescription
 	Answer webrtc.SessionDescription
 }
 
 type Room struct {
 	ID          string
 	WebRTCConns map[string]*webrtc.PeerConnection // Simpan koneksi WebRTC untuk setiap pengguna di room
-	Offers      []ClientOffer
-	Answer      []ClientAnswer
 	Lock        sync.Mutex
 	Title       string
+	HostUid     string
+	HostData    CommunicationData
+	ClientData  CommunicationData
 }
 
 var rooms map[string]*Room
@@ -38,6 +35,7 @@ func init() {
 
 type CreateRequset struct {
 	Judul string `json:"judul"`
+	Uid   string `json:"uid"`
 }
 
 func CreateRoom() fiber.Handler {
@@ -53,6 +51,7 @@ func CreateRoom() fiber.Handler {
 			ID:          roomID,
 			WebRTCConns: make(map[string]*webrtc.PeerConnection),
 			Title:       request.Judul,
+			HostUid:     request.Uid,
 		}
 		rooms[roomID] = room
 		return c.JSON(fiber.Map{"roomID": roomID, "title": request.Judul})
@@ -110,20 +109,11 @@ func JoinRoom() fiber.Handler {
 			}
 
 			room.Lock.Lock()
-			found := false
-			for i, clientOffer := range room.Offers {
 
-				if clientOffer.Uid == uid {
-					// Jika sudah ada, update nilai Answer
-					room.Offers[i].Offer = offer
-					found = true
-					break
-				}
-			}
-
-			// Jika Uid belum ada, tambahkan ke slice Answer
-			if !found {
-				room.Offers = append(room.Offers, ClientOffer{Uid: uid, Offer: offer})
+			if room.HostUid == uid {
+				room.HostData = CommunicationData{Uid: uid, Offer: offer}
+			} else {
+				room.ClientData = CommunicationData{Uid: uid, Offer: offer}
 			}
 
 			room.Lock.Unlock()
@@ -151,21 +141,11 @@ func JoinRoom() fiber.Handler {
 			}
 
 			room.Lock.Lock()
-			found := false
-			for i, clientAnswer := range room.Answer {
-				if clientAnswer.Uid == uid {
-					// Jika sudah ada, update nilai Answer
-					room.Answer[i].Answer = answer
-					found = true
-					break
-				}
+			if room.HostUid == uid {
+				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer}
+			} else {
+				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer}
 			}
-
-			// Jika Uid belum ada, tambahkan ke slice Answer
-			if !found {
-				room.Answer = append(room.Answer, ClientAnswer{Uid: uid, Answer: answer})
-			}
-
 			room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "answer", "data": answer})
 
