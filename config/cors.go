@@ -17,6 +17,7 @@ var origins = []string{
 	"https://meet.my.my.id",
 	"https://chatgpl.do.my.id",
 	"https://www.do.my.id",
+	"https://roo.my.my.id",
 }
 
 var headers = []string{
