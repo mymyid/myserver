@@ -1,0 +1,19 @@
+[Unit]
+Description=API WEB RTC
+ConditionPathExists=/home/html/webrtc
+After=network.target
+
+[Service]
+Type=simple
+User=user
+Group=user
+WorkingDirectory=/home/html/webrtc
+ExecStart=/home/sms/webrtc/app
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=webrtc-api
+
+[Install]
+WantedBy=multi-user.target

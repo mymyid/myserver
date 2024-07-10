@@ -9,7 +9,7 @@ func GetAddress() (ipport string, network string) {
 	port := os.Getenv("PORT")
 	network = "tcp4"
 	if port == "" {
-		port = ":8080"
+		ipport = ":8080"
 	} else if port[0:1] != ":" {
 		ip := os.Getenv("IP")
 		if ip == "" {
@@ -23,5 +23,6 @@ func GetAddress() (ipport string, network string) {
 			}
 		}
 	}
+
 	return
 }
