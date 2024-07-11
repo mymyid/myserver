@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -12,9 +11,10 @@ import (
 )
 
 type CommunicationData struct {
-	Uid    string
-	Offer  webrtc.SessionDescription
-	Answer webrtc.SessionDescription
+	Uid       string
+	Offer     webrtc.SessionDescription
+	Answer    webrtc.SessionDescription
+	Candidate webrtc.ICECandidateInit
 }
 
 type Room struct {
@@ -111,9 +111,9 @@ func JoinRoom() fiber.Handler {
 			room.Lock.Lock()
 
 			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Offer: offer}
+				room.HostData = CommunicationData{Uid: uid, Offer: offer, Answer: room.HostData.Answer, Candidate: room.HostData.Candidate}
 			} else {
-				room.ClientData = CommunicationData{Uid: uid, Offer: offer}
+				room.ClientData = CommunicationData{Uid: uid, Offer: offer, Answer: room.ClientData.Answer, Candidate: room.ClientData.Candidate}
 			}
 
 			room.Lock.Unlock()
@@ -142,9 +142,9 @@ func JoinRoom() fiber.Handler {
 
 			room.Lock.Lock()
 			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer}
+				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer, Candidate: room.HostData.Candidate}
 			} else {
-				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer}
+				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer, Candidate: room.ClientData.Candidate}
 			}
 			room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "answer", "data": answer})
@@ -160,15 +160,24 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ICE candidate format"})
 			}
 
-			if err := peerConnection.AddICECandidate(candidate); err != nil {
-				log.Println("ERR >> ", err.Error())
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add ICE candidate"})
+			room.Lock.Lock()
+			if room.HostUid == uid {
+				room.HostData = CommunicationData{Uid: uid, Answer: room.HostData.Answer, Offer: room.HostData.Offer, Candidate: candidate}
+			} else {
+				room.ClientData = CommunicationData{Uid: uid, Answer: room.ClientData.Answer, Offer: room.ClientData.Offer, Candidate: candidate}
 			}
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "candidate", "data": candidate})
+
+			// if err := peerConnection.AddICECandidate(candidate); err != nil {
+			// 	log.Println("ERR >> ", err.Error())
+			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add ICE candidate"})
+			// }
 		default:
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Unknown signal type"})
 		}
 
-		return c.SendStatus(fiber.StatusOK)
+		// return c.SendStatus(fiber.StatusOK)
 	}
 }
 
