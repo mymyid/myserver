@@ -18,13 +18,12 @@ type CommunicationData struct {
 }
 
 type Room struct {
-	ID          string
-	WebRTCConns map[string]*webrtc.PeerConnection // Simpan koneksi WebRTC untuk setiap pengguna di room
-	Lock        sync.Mutex
-	Title       string
-	HostUid     string
-	HostData    CommunicationData
-	ClientData  CommunicationData
+	ID         string
+	Lock       sync.Mutex
+	Title      string
+	HostUid    string
+	HostData   CommunicationData
+	ClientData CommunicationData
 }
 
 var rooms map[string]*Room
@@ -48,10 +47,9 @@ func CreateRoom() fiber.Handler {
 
 		roomID := generateRoomID()
 		room := &Room{
-			ID:          roomID,
-			WebRTCConns: make(map[string]*webrtc.PeerConnection),
-			Title:       request.Judul,
-			HostUid:     request.Uid,
+			ID:      roomID,
+			Title:   request.Judul,
+			HostUid: request.Uid,
 		}
 		rooms[roomID] = room
 		return c.JSON(fiber.Map{"roomID": roomID, "title": request.Judul})
@@ -81,23 +79,6 @@ func JoinRoom() fiber.Handler {
 		if err := c.BodyParser(&signal); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid signal format"})
 		}
-
-		var peerConnection *webrtc.PeerConnection
-		var err error
-
-		// Create a new PeerConnection if it doesn't exist
-		room.Lock.Lock()
-		if _, exists := room.WebRTCConns[c.IP()]; !exists {
-			peerConnection, err = createPeerConnection()
-			if err != nil {
-				room.Lock.Unlock()
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create PeerConnection"})
-			}
-			room.WebRTCConns[c.IP()] = peerConnection
-		} else {
-			peerConnection = room.WebRTCConns[c.IP()]
-		}
-		room.Lock.Unlock()
 
 		// Handle signaling based on signal.Type (offer, answer, candidate, etc.)
 		switch signal.Type {
