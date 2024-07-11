@@ -17,8 +17,7 @@ var origins = []string{
 	"https://meet.my.my.id",
 	"https://chatgpl.do.my.id",
 	"https://www.do.my.id",
-	"http://127.0.0.1:5500",
-	"http://localhost:5500",
+	"https://roo.my.my.id",
 }
 
 var headers = []string{

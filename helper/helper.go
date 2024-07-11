@@ -8,10 +8,9 @@ import (
 
 func GetAddress() (ipport string, network string) {
 	port := os.Getenv("PORT")
-	log.Println("SERVER PORT >> ", port)
 	network = "tcp4"
 	if port == "" {
-		ipport = ":5199"
+		ipport = ":8080"
 	} else if port[0:1] != ":" {
 		ip := os.Getenv("IP")
 		log.Println("SERVER IP >> ", ip)
