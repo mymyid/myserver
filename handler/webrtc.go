@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -12,19 +11,19 @@ import (
 )
 
 type CommunicationData struct {
-	Uid    string
-	Offer  webrtc.SessionDescription
-	Answer webrtc.SessionDescription
+	Uid       string
+	Offer     webrtc.SessionDescription
+	Answer    webrtc.SessionDescription
+	Candidate webrtc.ICECandidateInit
 }
 
 type Room struct {
-	ID          string
-	WebRTCConns map[string]*webrtc.PeerConnection // Simpan koneksi WebRTC untuk setiap pengguna di room
-	Lock        sync.Mutex
-	Title       string
-	HostUid     string
-	HostData    CommunicationData
-	ClientData  CommunicationData
+	ID         string
+	Lock       sync.Mutex
+	Title      string
+	HostUid    string
+	HostData   CommunicationData
+	ClientData CommunicationData
 }
 
 var rooms map[string]*Room
@@ -48,10 +47,9 @@ func CreateRoom() fiber.Handler {
 
 		roomID := generateRoomID()
 		room := &Room{
-			ID:          roomID,
-			WebRTCConns: make(map[string]*webrtc.PeerConnection),
-			Title:       request.Judul,
-			HostUid:     request.Uid,
+			ID:      roomID,
+			Title:   request.Judul,
+			HostUid: request.Uid,
 		}
 		rooms[roomID] = room
 		return c.JSON(fiber.Map{"roomID": roomID, "title": request.Judul})
@@ -82,23 +80,6 @@ func JoinRoom() fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid signal format"})
 		}
 
-		var peerConnection *webrtc.PeerConnection
-		var err error
-
-		// Create a new PeerConnection if it doesn't exist
-		room.Lock.Lock()
-		if _, exists := room.WebRTCConns[c.IP()]; !exists {
-			peerConnection, err = createPeerConnection()
-			if err != nil {
-				room.Lock.Unlock()
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create PeerConnection"})
-			}
-			room.WebRTCConns[c.IP()] = peerConnection
-		} else {
-			peerConnection = room.WebRTCConns[c.IP()]
-		}
-		room.Lock.Unlock()
-
 		// Handle signaling based on signal.Type (offer, answer, candidate, etc.)
 		switch signal.Type {
 		case "offer":
@@ -111,9 +92,9 @@ func JoinRoom() fiber.Handler {
 			room.Lock.Lock()
 
 			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Offer: offer}
+				room.HostData = CommunicationData{Uid: uid, Offer: offer, Answer: room.HostData.Answer, Candidate: room.HostData.Candidate}
 			} else {
-				room.ClientData = CommunicationData{Uid: uid, Offer: offer}
+				room.ClientData = CommunicationData{Uid: uid, Offer: offer, Answer: room.ClientData.Answer, Candidate: room.ClientData.Candidate}
 			}
 
 			room.Lock.Unlock()
@@ -142,9 +123,9 @@ func JoinRoom() fiber.Handler {
 
 			room.Lock.Lock()
 			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer}
+				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer, Candidate: room.HostData.Candidate}
 			} else {
-				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer}
+				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer, Candidate: room.ClientData.Candidate}
 			}
 			room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "answer", "data": answer})
@@ -160,15 +141,24 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ICE candidate format"})
 			}
 
-			if err := peerConnection.AddICECandidate(candidate); err != nil {
-				log.Println("ERR >> ", err.Error())
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add ICE candidate"})
+			room.Lock.Lock()
+			if room.HostUid == uid {
+				room.HostData = CommunicationData{Uid: uid, Answer: room.HostData.Answer, Offer: room.HostData.Offer, Candidate: candidate}
+			} else {
+				room.ClientData = CommunicationData{Uid: uid, Answer: room.ClientData.Answer, Offer: room.ClientData.Offer, Candidate: candidate}
 			}
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "candidate", "data": candidate})
+
+			// if err := peerConnection.AddICECandidate(candidate); err != nil {
+			// 	log.Println("ERR >> ", err.Error())
+			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add ICE candidate"})
+			// }
 		default:
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Unknown signal type"})
 		}
 
-		return c.SendStatus(fiber.StatusOK)
+		// return c.SendStatus(fiber.StatusOK)
 	}
 }
 
