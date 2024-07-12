@@ -21,6 +21,7 @@ func Web(page *fiber.App) {
 	page.Post("/api/room/:roomID/join/:uid", handler.JoinRoom())
 	page.Get("/api/room/:roomID/offer/:uid", handler.JoinRoom())
 	page.Post("/api/room/:roomID/candidate/:uid", handler.JoinRoom())
+	page.Get("/api/room/:roomID/candidate/:uid", handler.GetCandidate())
 	page.Get("/api/room/:roomID/data/:uid", handler.GetOfferAnswer())
 
 }

@@ -10,20 +10,17 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-type CommunicationData struct {
-	Uid       string
-	Candidate webrtc.ICECandidateInit
-}
-
 type Room struct {
-	ID       string
-	Lock     sync.Mutex
-	Title    string
-	HostUid  string
-	Host     string
-	HostName string
-	Offer    webrtc.SessionDescription
-	Answer   webrtc.SessionDescription
+	ID                 string
+	Lock               sync.Mutex
+	Title              string
+	HostUid            string
+	Host               string
+	HostName           string
+	Offer              webrtc.SessionDescription
+	Answer             webrtc.SessionDescription
+	HostIceCandidate   []webrtc.ICECandidateInit
+	ClientIceCandidate []webrtc.ICECandidateInit
 }
 
 var rooms map[string]*Room
@@ -68,12 +65,12 @@ func GetRooms() fiber.Handler {
 
 func JoinRoom() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// roomID := c.Params("roomID")
-		// uid := c.Params("uid")
-		// room, ok := rooms[roomID]
-		// if !ok {
-		// 	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Room not found"})
-		// }
+		roomID := c.Params("roomID")
+		uid := c.Params("uid")
+		room, ok := rooms[roomID]
+		if !ok {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Room not found"})
+		}
 
 		// Parse the incoming signal
 		var signal struct {
@@ -93,31 +90,13 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid offer format"})
 			}
 
-			// room.Lock.Lock()
+			room.Lock.Lock()
 
-			// if room.HostUid == uid {
-			// 	room.HostData = CommunicationData{Uid: uid, Offer: offer, Answer: room.HostData.Answer, Candidate: room.HostData.Candidate}
-			// } else {
-			// 	room.ClientData = CommunicationData{Uid: uid, Offer: offer, Answer: room.ClientData.Answer, Candidate: room.ClientData.Candidate}
-			// }
+			room.Offer = offer
 
-			// room.Lock.Unlock()
-			return c.JSON(fiber.Map{"type": "offer", "data": offer})
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "offer", "data": room})
 
-			// if err := peerConnection.SetRemoteDescription(offer); err != nil {
-			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to set remote description"})
-			// }
-
-			// answer, err := peerConnection.CreateAnswer(nil)
-			// if err != nil {
-			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create answer"})
-			// }
-
-			// if err := peerConnection.SetLocalDescription(answer); err != nil {
-			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to set local description"})
-			// }
-
-			// return c.JSON(fiber.Map{"type": "answer", "data": answer})
 		case "answer":
 			// Process answer and set remote description
 			answer := webrtc.SessionDescription{}
@@ -125,18 +104,13 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid answer format"})
 			}
 
-			// room.Lock.Lock()
-			// if room.HostUid == uid {
-			// 	room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer, Candidate: room.HostData.Candidate}
-			// } else {
-			// 	room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer, Candidate: room.ClientData.Candidate}
-			// }
-			// room.Lock.Unlock()
-			return c.JSON(fiber.Map{"type": "answer", "data": answer})
+			room.Lock.Lock()
 
-			// if err := peerConnection.SetRemoteDescription(answer); err != nil {
-			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to set remote description"})
-			// }
+			room.Answer = answer
+
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "answer", "data": room})
+
 		case "candidate":
 			// Process ICE candidate
 			candidate := webrtc.ICECandidateInit{}
@@ -145,14 +119,14 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ICE candidate format"})
 			}
 
-			// room.Lock.Lock()
-			// if room.HostUid == uid {
-			// 	room.HostData = CommunicationData{Uid: uid, Answer: room.HostData.Answer, Offer: room.HostData.Offer, Candidate: candidate}
-			// } else {
-			// 	room.ClientData = CommunicationData{Uid: uid, Answer: room.ClientData.Answer, Offer: room.ClientData.Offer, Candidate: candidate}
-			// }
-			// room.Lock.Unlock()
-			return c.JSON(fiber.Map{"type": "candidate", "data": candidate})
+			room.Lock.Lock()
+			if room.HostUid == uid {
+				room.HostIceCandidate = append(room.HostIceCandidate, candidate)
+			} else {
+				room.ClientIceCandidate = append(room.ClientIceCandidate, candidate)
+			}
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "candidate", "data": room})
 
 			// if err := peerConnection.AddICECandidate(candidate); err != nil {
 			// 	log.Println("ERR >> ", err.Error())
@@ -179,16 +153,17 @@ func GetOfferAnswer() fiber.Handler {
 	}
 }
 
-// Helper function to create a new PeerConnection
-func createPeerConnection() (*webrtc.PeerConnection, error) {
-	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
+func GetCandidate() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		roomID := c.Params("roomID")
+		// uid := c.Params("uid")
+		room, ok := rooms[roomID]
+		if !ok {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Room not found"})
+		}
+
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"room": room})
 	}
-	return webrtc.NewPeerConnection(config)
 }
 
 func generateRoomID() string {
