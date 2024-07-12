@@ -12,18 +12,18 @@ import (
 
 type CommunicationData struct {
 	Uid       string
-	Offer     webrtc.SessionDescription
-	Answer    webrtc.SessionDescription
 	Candidate webrtc.ICECandidateInit
 }
 
 type Room struct {
-	ID         string
-	Lock       sync.Mutex
-	Title      string
-	HostUid    string
-	HostData   CommunicationData
-	ClientData CommunicationData
+	ID       string
+	Lock     sync.Mutex
+	Title    string
+	HostUid  string
+	Host     string
+	HostName string
+	Offer    webrtc.SessionDescription
+	Answer   webrtc.SessionDescription
 }
 
 var rooms map[string]*Room
@@ -33,8 +33,10 @@ func init() {
 }
 
 type CreateRequset struct {
-	Judul string `json:"judul"`
-	Uid   string `json:"uid"`
+	Judul    string `json:"judul"`
+	Uid      string `json:"uid"`
+	Host     string `json:"host"`
+	HostName string `json:"host_name"`
 }
 
 func CreateRoom() fiber.Handler {
@@ -47,12 +49,14 @@ func CreateRoom() fiber.Handler {
 
 		roomID := generateRoomID()
 		room := &Room{
-			ID:      roomID,
-			Title:   request.Judul,
-			HostUid: request.Uid,
+			ID:       roomID,
+			Title:    request.Judul,
+			HostUid:  request.Uid,
+			Host:     request.Host,
+			HostName: request.HostName,
 		}
 		rooms[roomID] = room
-		return c.JSON(fiber.Map{"roomID": roomID, "title": request.Judul})
+		return c.JSON(room)
 	}
 }
 
@@ -64,12 +68,12 @@ func GetRooms() fiber.Handler {
 
 func JoinRoom() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		roomID := c.Params("roomID")
-		uid := c.Params("uid")
-		room, ok := rooms[roomID]
-		if !ok {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Room not found"})
-		}
+		// roomID := c.Params("roomID")
+		// uid := c.Params("uid")
+		// room, ok := rooms[roomID]
+		// if !ok {
+		// 	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Room not found"})
+		// }
 
 		// Parse the incoming signal
 		var signal struct {
@@ -89,15 +93,15 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid offer format"})
 			}
 
-			room.Lock.Lock()
+			// room.Lock.Lock()
 
-			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Offer: offer, Answer: room.HostData.Answer, Candidate: room.HostData.Candidate}
-			} else {
-				room.ClientData = CommunicationData{Uid: uid, Offer: offer, Answer: room.ClientData.Answer, Candidate: room.ClientData.Candidate}
-			}
+			// if room.HostUid == uid {
+			// 	room.HostData = CommunicationData{Uid: uid, Offer: offer, Answer: room.HostData.Answer, Candidate: room.HostData.Candidate}
+			// } else {
+			// 	room.ClientData = CommunicationData{Uid: uid, Offer: offer, Answer: room.ClientData.Answer, Candidate: room.ClientData.Candidate}
+			// }
 
-			room.Lock.Unlock()
+			// room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "offer", "data": offer})
 
 			// if err := peerConnection.SetRemoteDescription(offer); err != nil {
@@ -121,13 +125,13 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid answer format"})
 			}
 
-			room.Lock.Lock()
-			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer, Candidate: room.HostData.Candidate}
-			} else {
-				room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer, Candidate: room.ClientData.Candidate}
-			}
-			room.Lock.Unlock()
+			// room.Lock.Lock()
+			// if room.HostUid == uid {
+			// 	room.HostData = CommunicationData{Uid: uid, Answer: answer, Offer: room.HostData.Offer, Candidate: room.HostData.Candidate}
+			// } else {
+			// 	room.ClientData = CommunicationData{Uid: uid, Answer: answer, Offer: room.ClientData.Offer, Candidate: room.ClientData.Candidate}
+			// }
+			// room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "answer", "data": answer})
 
 			// if err := peerConnection.SetRemoteDescription(answer); err != nil {
@@ -141,13 +145,13 @@ func JoinRoom() fiber.Handler {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid ICE candidate format"})
 			}
 
-			room.Lock.Lock()
-			if room.HostUid == uid {
-				room.HostData = CommunicationData{Uid: uid, Answer: room.HostData.Answer, Offer: room.HostData.Offer, Candidate: candidate}
-			} else {
-				room.ClientData = CommunicationData{Uid: uid, Answer: room.ClientData.Answer, Offer: room.ClientData.Offer, Candidate: candidate}
-			}
-			room.Lock.Unlock()
+			// room.Lock.Lock()
+			// if room.HostUid == uid {
+			// 	room.HostData = CommunicationData{Uid: uid, Answer: room.HostData.Answer, Offer: room.HostData.Offer, Candidate: candidate}
+			// } else {
+			// 	room.ClientData = CommunicationData{Uid: uid, Answer: room.ClientData.Answer, Offer: room.ClientData.Offer, Candidate: candidate}
+			// }
+			// room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "candidate", "data": candidate})
 
 			// if err := peerConnection.AddICECandidate(candidate); err != nil {
