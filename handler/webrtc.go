@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -24,6 +25,8 @@ type Room struct {
 }
 
 var rooms map[string]*Room
+
+var mapLock sync.Mutex
 
 func init() {
 	rooms = make(map[string]*Room)
@@ -59,6 +62,22 @@ func CreateRoom() fiber.Handler {
 
 func GetRooms() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		return c.JSON(rooms)
+	}
+}
+
+func DeleteRoom() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		roomID := c.Params("roomID")
+
+		mapLock.Lock()         // Lock the map
+		defer mapLock.Unlock() // Ensure the map is unlocked after the operation
+
+		if _, exists := rooms[roomID]; exists {
+			delete(rooms, roomID) // Remove the room from the map
+		} else {
+			fmt.Printf("Room with ID %s does not exist\n", roomID)
+		}
 		return c.JSON(rooms)
 	}
 }

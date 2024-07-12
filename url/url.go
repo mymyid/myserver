@@ -17,6 +17,7 @@ func Web(page *fiber.App) {
 	// Endpoint untuk membuat room baru
 	page.Post("/api/create-room", handler.CreateRoom())
 	page.Get("/api/rooms", handler.GetRooms())
+	page.Delete("/api/rooms/:roomID", handler.DeleteRoom())
 	// Endpoint untuk meng-handle WebRTC signaling
 	page.Post("/api/room/:roomID/join/:uid", handler.JoinRoom())
 	page.Get("/api/room/:roomID/offer/:uid", handler.JoinRoom())
