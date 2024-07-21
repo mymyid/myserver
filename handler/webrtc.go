@@ -18,6 +18,8 @@ type Room struct {
 	HostUid            string
 	Host               string
 	HostName           string
+	ClientConnected    bool
+	HostConnected      bool
 	Offer              webrtc.SessionDescription
 	Answer             webrtc.SessionDescription
 	HostIceCandidate   []webrtc.ICECandidateInit
@@ -146,11 +148,29 @@ func JoinRoom() fiber.Handler {
 			}
 			room.Lock.Unlock()
 			return c.JSON(fiber.Map{"type": "candidate", "data": room})
+		case "connected":
+			// Process ICE candidate
+			room.Lock.Lock()
+			if room.HostUid == uid {
+				room.HostConnected = true
+			} else {
+				room.ClientConnected = true
+			}
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "candidate", "data": room})
+		case "disconnected":
 
-			// if err := peerConnection.AddICECandidate(candidate); err != nil {
-			// 	log.Println("ERR >> ", err.Error())
-			// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add ICE candidate"})
-			// }
+			room.Lock.Lock()
+			room.HostIceCandidate = []webrtc.ICECandidateInit{}
+			room.ClientIceCandidate = []webrtc.ICECandidateInit{}
+			room.Offer = webrtc.SessionDescription{}
+			room.Answer = webrtc.SessionDescription{}
+			room.HostConnected = false
+			room.ClientConnected = false
+
+			room.Lock.Unlock()
+			return c.JSON(fiber.Map{"type": "candidate", "data": room})
+
 		default:
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Unknown signal type"})
 		}
